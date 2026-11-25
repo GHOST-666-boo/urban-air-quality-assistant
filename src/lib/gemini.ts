@@ -231,7 +231,14 @@ export async function generateAirQualityPlan(
   const primaryModel =
     process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
   const modelCandidates = Array.from(
-    new Set([primaryModel, "gemini-3.5-flash-lite", "gemini-3.8-flash"])
+    new Set([
+      primaryModel,
+      "gemini-3.5-flash-lite",
+      "gemini-3.6-flash",
+      "gemini-3.1-flash-lite",
+      "gemini-3.8-flash",
+      "gemini-4-hydrogen",
+    ])
   );
 
   if (!apiKey) {
@@ -260,7 +267,7 @@ export async function generateAirQualityPlan(
           },
         }),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`${modelName} timed out (8s)`)), 8000)
+          setTimeout(() => reject(new Error(`${modelName} timed out (6s)`)), 6000)
         ),
       ]);
 
