@@ -194,7 +194,7 @@ ${input.dailySchedule}
 ### Additional Notes / Constraints
 ${input.additionalNotes?.trim() || "None provided"}
 
-Provide 3-4 tailored Low-Emission Routines, 3-4 practical Indoor Air Quality Hacks (prioritizing winter smog & low-cost options), 3-4 transparent Health & Environmental Impact Breakdown items, and 4 Quick Wins.`;
+Provide 3 concise Low-Emission Routines, 3 practical Indoor Air Quality Hacks (prioritizing winter smog & low-cost options), 3 transparent Health & Environmental Impact Breakdown items, and 3 Quick Wins. Keep every description crisp (1-2 sentences) for fast reading.`;
 }
 
 function isValidPlanShape(data: unknown): data is Omit<AirQualityPlanResponse, "metadata"> {
@@ -224,21 +224,14 @@ function isTransientOverloadError(error: unknown): boolean {
   );
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 export async function generateAirQualityPlan(
   input: RoutineInput
 ): Promise<AirQualityPlanResponse> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
-  const primaryModel = process.env.GEMINI_MODEL?.trim() || "gemini-4-hydrogen";
+  const primaryModel =
+    process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
   const modelCandidates = Array.from(
-    new Set([
-      primaryModel,
-      "gemini-4-hydrogen",
-      "gemini-3.8-flash",
-      "gemini-3.6-flash",
-      "gemini-3.5-flash-lite",
-    ])
+    new Set([primaryModel, "gemini-3.5-flash-lite", "gemini-3.8-flash"])
   );
 
   if (!apiKey) {
@@ -253,56 +246,53 @@ export async function generateAirQualityPlan(
   let lastErrorMessage = "Unknown Gemini API error";
 
   for (const modelName of modelCandidates) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const response = await ai.models.generateContent({
+    try {
+      const response = await Promise.race([
+        ai.models.generateContent({
           model: modelName,
           contents: userPrompt,
           config: {
             systemInstruction: SYSTEM_INSTRUCTION,
             responseMimeType: "application/json",
             responseSchema: RESPONSE_SCHEMA,
-            temperature: 0.4,
+            temperature: 0.3,
+            maxOutputTokens: 1400,
           },
-        });
+        }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`${modelName} timed out (8s)`)), 8000)
+        ),
+      ]);
 
-        const rawText = response.text;
-        if (!rawText) {
-          lastErrorMessage = `${modelName} returned an empty response.`;
-          break;
-        }
-
-        const parsed = JSON.parse(rawText);
-        if (!isValidPlanShape(parsed)) {
-          lastErrorMessage = `${modelName} response did not match expected schema.`;
-          break;
-        }
-
-        return {
-          ...parsed,
-          liveTelemetry: input.liveTelemetry ?? null,
-          metadata: {
-            source: "gemini",
-            model: modelName,
-            generatedAt: new Date().toISOString(),
-          },
-        };
-      } catch (error) {
-        lastErrorMessage =
-          error instanceof Error ? error.message : "Unknown Gemini API error";
-        if (isTransientOverloadError(error) && attempt === 0) {
-          await sleep(1200);
-          continue;
-        }
-        if (isTransientOverloadError(error)) {
-          console.warn(
-            `[Gemini Retry]: ${modelName} busy (503/429), trying next model...`
-          );
-          break;
-        }
-        console.error("[Gemini Service Error]:", lastErrorMessage);
-        break;
+      const rawText = response.text;
+      if (!rawText) {
+        lastErrorMessage = `${modelName} returned an empty response.`;
+        continue;
       }
+
+      const parsed = JSON.parse(rawText);
+      if (!isValidPlanShape(parsed)) {
+        lastErrorMessage = `${modelName} response did not match expected schema.`;
+        continue;
+      }
+
+      return {
+        ...parsed,
+        liveTelemetry: input.liveTelemetry ?? null,
+        metadata: {
+          source: "gemini",
+          model: modelName,
+          generatedAt: new Date().toISOString(),
+        },
+      };
+    } catch (error) {
+      lastErrorMessage =
+        error instanceof Error ? error.message : "Unknown Gemini API error";
+      if (isTransientOverloadError(error)) {
+        console.warn(`[Gemini Fast-Failover]: ${modelName} busy, trying next...`);
+        continue;
+      }
+      console.error("[Gemini Service Error]:", lastErrorMessage);
     }
   }
 

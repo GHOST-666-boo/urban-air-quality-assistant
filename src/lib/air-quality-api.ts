@@ -21,7 +21,7 @@ export async function fetchLiveCityAirAndWeather(
     )}&count=1&language=en&format=json`;
 
     const geoRes = await fetch(geoUrl, {
-      signal: AbortSignal.timeout(4500),
+      signal: AbortSignal.timeout(2000),
       next: { revalidate: 300 },
     });
 
@@ -50,11 +50,11 @@ export async function fetchLiveCityAirAndWeather(
 
     const [aqiRes, weatherRes] = await Promise.all([
       fetch(aqiUrl, {
-        signal: AbortSignal.timeout(4500),
+        signal: AbortSignal.timeout(2000),
         next: { revalidate: 300 },
       }),
       fetch(weatherUrl, {
-        signal: AbortSignal.timeout(4500),
+        signal: AbortSignal.timeout(2000),
         next: { revalidate: 300 },
       }),
     ]);
