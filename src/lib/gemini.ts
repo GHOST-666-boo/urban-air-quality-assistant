@@ -232,7 +232,7 @@ export async function generateAirQualityPlan(
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   const primaryModel = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
   const modelCandidates = Array.from(
-    new Set([primaryModel, "gemini-2.5-flash-lite", "gemini-2.0-flash"])
+    new Set([primaryModel, "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"])
   );
 
   if (!apiKey) {
