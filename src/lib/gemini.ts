@@ -230,9 +230,15 @@ export async function generateAirQualityPlan(
   input: RoutineInput
 ): Promise<AirQualityPlanResponse> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
-  const primaryModel = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+  const primaryModel = process.env.GEMINI_MODEL?.trim() || "gemini-4-hydrogen";
   const modelCandidates = Array.from(
-    new Set([primaryModel, "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"])
+    new Set([
+      primaryModel,
+      "gemini-4-hydrogen",
+      "gemini-3.8-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash-lite",
+    ])
   );
 
   if (!apiKey) {
@@ -285,7 +291,7 @@ export async function generateAirQualityPlan(
         lastErrorMessage =
           error instanceof Error ? error.message : "Unknown Gemini API error";
         if (isTransientOverloadError(error) && attempt === 0) {
-          await sleep(750);
+          await sleep(1200);
           continue;
         }
         if (isTransientOverloadError(error)) {
