@@ -1,5 +1,8 @@
 import type { AqiCategory, LiveEnvironmentalData } from "../types/air-quality.ts";
 
+/**
+ * Maps a numeric US EPA AQI value to its standard health risk category.
+ */
 export function classifyUsAqi(aqi: number): AqiCategory {
   if (aqi <= 50) return "Good";
   if (aqi <= 100) return "Moderate";
@@ -9,6 +12,10 @@ export function classifyUsAqi(aqi: number): AqiCategory {
   return "Hazardous";
 }
 
+/**
+ * Fetches real-time geocoding, air quality (US AQI, PM2.5, PM10, NO2, O3),
+ * and weather (temperature, humidity, wind) from Open-Meteo with 2s timeouts.
+ */
 export async function fetchLiveCityAirAndWeather(
   cityQuery: string
 ): Promise<LiveEnvironmentalData | null> {

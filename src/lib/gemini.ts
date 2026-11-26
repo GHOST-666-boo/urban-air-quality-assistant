@@ -1,6 +1,6 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { AirQualityPlanResponse, RoutineInput } from "@/types/air-quality";
-import { buildFallbackPlan } from "./fallback";
+import { GoogleGenAI, Type, type Schema } from "@google/genai";
+import type { AirQualityPlanResponse, RoutineInput } from "../types/air-quality.ts";
+import { buildFallbackPlan } from "./fallback.ts";
 
 const SYSTEM_INSTRUCTION = `You are an expert Urban Air Quality & Environmental Health Specialist.
 Your mission is to analyze a user's or family's daily routine, home type, commute mode, and city/seasonal context, and produce a practical, hyper-tailored action plan.
@@ -159,7 +159,11 @@ const RESPONSE_SCHEMA: Schema = {
   ],
 };
 
-function buildUserPrompt(input: RoutineInput): string {
+/**
+ * Builds the structured user prompt combining household profile, schedule,
+ * and optional verified Open-Meteo live telemetry.
+ */
+export function buildUserPrompt(input: RoutineInput): string {
   const membersText =
     input.familyMembers.length > 0
       ? input.familyMembers
@@ -197,7 +201,13 @@ ${input.additionalNotes?.trim() || "None provided"}
 Provide 3 concise Low-Emission Routines, 3 practical Indoor Air Quality Hacks (prioritizing winter smog & low-cost options), 3 transparent Health & Environmental Impact Breakdown items, and 3 Quick Wins. Keep every description crisp (1-2 sentences) for fast reading.`;
 }
 
-function isValidPlanShape(data: unknown): data is Omit<AirQualityPlanResponse, "metadata"> {
+/**
+ * Runtime type guard verifying that parsed LLM JSON contains all required
+ * structured sections with non-empty recommendation arrays.
+ */
+export function isValidPlanShape(
+  data: unknown
+): data is Omit<AirQualityPlanResponse, "metadata"> {
   if (!data || typeof data !== "object") return false;
   const candidate = data as Record<string, unknown>;
   return (
@@ -224,6 +234,10 @@ function isTransientOverloadError(error: unknown): boolean {
   );
 }
 
+/**
+ * Generates a tailored air quality & low-emission action plan using Google Gemini
+ * structured JSON output, with fast multi-model failover and offline fallback.
+ */
 export async function generateAirQualityPlan(
   input: RoutineInput
 ): Promise<AirQualityPlanResponse> {

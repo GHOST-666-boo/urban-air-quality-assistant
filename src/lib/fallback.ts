@@ -60,6 +60,10 @@ function estimateCityBaselineAqi(city: string, conditionContext: string): {
   };
 }
 
+/**
+ * Builds a deterministic, city- and sensitivity-aware baseline plan when the
+ * Gemini API is unconfigured or temporarily unavailable.
+ */
 export function buildFallbackPlan(
   input: RoutineInput,
   fallbackReason: string
