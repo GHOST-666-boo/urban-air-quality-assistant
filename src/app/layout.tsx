@@ -14,12 +14,26 @@ const firaCode = Fira_Code({
   weight: ["400", "500", "600", "700"],
 });
 
+/** Application metadata used for SEO, OpenGraph previews, and document title. */
 export const metadata: Metadata = {
   title: "Urban Air Quality Assistant | PromptWars Challenge 06",
   description:
     "Interactive GenAI assistant for tailored low-emission daily routines, winter smog indoor air hacks, and transparent health & environmental impact insights.",
+  keywords: [
+    "air quality",
+    "AQI",
+    "low emission",
+    "indoor air quality",
+    "winter smog",
+    "sustainability",
+    "Gemini AI",
+  ],
 };
 
+/**
+ * Root HTML layout configuring Fira Sans and Fira Code typography,
+ * dark color scheme defaults, and hydration safety.
+ */
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html

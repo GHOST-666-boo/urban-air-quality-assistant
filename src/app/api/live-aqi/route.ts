@@ -1,26 +1,22 @@
+/**
+ * @module api/live-aqi
+ * Thin Next.js App Router GET endpoint delegating telemetry lookup and
+ * rate limiting to {@link processLiveAqiRequest}.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
-import { fetchLiveCityAirAndWeather } from "@/lib/air-quality-api";
+import { processLiveAqiRequest } from "@/lib/analyze-service";
 
-export async function GET(req: NextRequest) {
-  const city = req.nextUrl.searchParams.get("city")?.trim() || "";
-
-  if (!city) {
-    return NextResponse.json(
-      { error: "City query parameter is required." },
-      { status: 400 }
-    );
-  }
-
-  const telemetry = await fetchLiveCityAirAndWeather(city);
-  if (!telemetry) {
-    return NextResponse.json(
-      {
-        error:
-          "Could not fetch live weather/AQI for that city. You can still enter conditions manually.",
-      },
-      { status: 404 }
-    );
-  }
-
-  return NextResponse.json(telemetry, { status: 200 });
+/**
+ * GET /api/live-aqi?city=CityName
+ *
+ * Delegates live city weather & AQI resolution to {@link processLiveAqiRequest}.
+ */
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const cityParam = req.nextUrl.searchParams.get("city");
+  const result = await processLiveAqiRequest(cityParam, req.headers);
+  return NextResponse.json(result.body, {
+    status: result.status,
+    headers: result.headers,
+  });
 }

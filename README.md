@@ -1,13 +1,17 @@
 # Urban Air Quality Assistant — PromptWars Main Challenge 06
 
-An interactive, production-ready GenAI web application that transforms a household's daily routine, commute habits, and living environment into a structured, actionable plan for **reducing personal pollution exposure**, **lowering carbon emissions**, and **improving indoor air quality** (especially during winter smog and high-AQI episodes).
+An interactive, production-ready GenAI web application that analyzes a household's daily routine, commute patterns, residential environment, and health sensitivities to generate tailored **low-emission routines**, **cost-tiered indoor air quality hacks** (optimized for winter smog and high-AQI episodes), and **plain-language health and environmental impact explanations**.
 
 ---
 
-## Chosen Vertical
+## Challenge 06 Alignment Matrix
 
-**PromptWars Main Challenge 06: Urban Air Quality Assistant**
-- **Target Persona**: Urban households (commuters, parents with young children, elderly residents, and individuals with respiratory/cardiovascular sensitivities) navigating seasonal smog, rush-hour particulate spikes, and indoor air infiltration.
+| PromptWars Challenge 06 Objective | Implemented Solution & Module |
+| --- | --- |
+| **1. Analyze Daily Routines & Context** | Guided Form + Quick Describe natural-language input ([RoutineInputForm.tsx](src/components/RoutineInputForm.tsx)), household sensitivity tags ([FamilyMembersEditor.tsx](src/components/FamilyMembersEditor.tsx)), and automatic Open-Meteo real-time city telemetry ([air-quality-api.ts](src/lib/air-quality-api.ts)). |
+| **2. Tailored Low-Emission Routines** | Commute shifts, trip batching, and inversion-aware outdoor scheduling with weekly `kg CO₂ saved`, exposure reduction `%`, and feasibility tags ([gemini.ts](src/lib/gemini.ts), [DashboardTabsContent.tsx](src/components/dashboard/DashboardTabsContent.tsx)). |
+| **3. Indoor AQI & Winter Smog Hacks** | Free & low-cost home techniques (DIY Corsi-Rosenthal MERV-13 fan filters, draft sealing, damp-mopping, kitchen exhaust discipline) prioritized by `winterSmogSpecific` flag and home type ([fallback.ts](src/lib/fallback.ts), [DashboardTabsContent.tsx](src/components/dashboard/DashboardTabsContent.tsx)). |
+| **4. Health & Emission Impact Explanations** | Transparent cause-and-effect cards translating every recommendation into plain-language health benefits, pollutant reductions, and sensitive member beneficiaries ([AqiSummaryCard.tsx](src/components/AqiSummaryCard.tsx), [AirQualityDashboard.tsx](src/components/AirQualityDashboard.tsx)). |
 
 ---
 
@@ -18,67 +22,73 @@ flowchart LR
     U[User / Family Profile] --> UI[Next.js Dark-Theme UI\nGuided Form & Quick Describe]
     UI -->|GET /api/live-aqi| OM[Open-Meteo Geocoding,\nWeather & Air Quality APIs]
     OM -->|US AQI, PM2.5, PM10,\nNO2, O3, Temp, Wind| UI
-    UI -->|POST /api/analyze| API[Next.js App Router API\nValidation & Server Grounding]
+    UI -->|POST /api/analyze| API[App Router API\nRate Limit + Validation + Grounding]
     API -->|Auto-fetch if missing| OM
     API --> G{GEMINI_API_KEY\nConfigured?}
-    G -->|Yes| GEM[Google GenAI SDK\ngemini-2.5-flash + JSON Schema]
-    G -->|No / Error| FB[Deterministic Urban AQI\nFallback Engine]
+    G -->|Yes| GEM[Google GenAI SDK\n5-Model Fast Failover + Structured JSON]
+    G -->|No / Busy| FB[Deterministic Urban AQI\nFallback Engine]
     GEM -->|Validated JSON| RES[Structured AirQualityPlanResponse]
     FB --> RES
-    RES --> DASH[Responsive Dashboard\nAQI Spectrum • Routines • Indoor Hacks • Impact]
+    RES --> DASH[Accessible Dashboard\nAQI Meter • Quick Wins • WAI-ARIA Tabs]
 ```
 
 ### Modular Directory Structure
-- `src/types/air-quality.ts` — Strong TypeScript interfaces for household inputs, live telemetry, AQI risk summaries, routines, indoor hacks, and impact breakdowns.
-- `src/lib/air-quality-api.ts` — Open-Meteo integration (Geocoding + Air Quality + Weather APIs) with timeout guards and US AQI classification.
-- `src/lib/gemini.ts` — Google GenAI SDK (`@google/genai`) client with system instructions, live telemetry injection, strict `responseSchema` JSON mode, and runtime shape validation.
-- `src/lib/fallback.ts` — Graceful offline/fallback engine that generates city- and sensitivity-aware baseline plans if `GEMINI_API_KEY` is missing or an upstream error occurs.
-- `src/app/api/live-aqi/route.ts` — `GET /api/live-aqi?city=...` endpoint for instant condition verification.
-- `src/app/api/analyze/route.ts` — `POST /api/analyze` endpoint with input validation, sanitization, and automatic server-side telemetry grounding.
-- `src/components/RoutineInputForm.tsx` — Dual-mode input (Guided Form + Quick Describe) with live AQI lookup, dynamic family sensitivity tags, and one-click sample scenarios.
-- `src/components/AirQualityDashboard.tsx` — High-contrast dark-theme dashboard displaying AQI risk badges, 0–350+ AQI spectrum bar, live weather/pollutant strip, weekly CO₂ savings, Quick Wins, and tabbed action cards.
+
+- `src/types/air-quality.ts` — Documented TypeScript interfaces for household inputs, live telemetry, AQI summaries, routines, indoor hacks, and impact cards.
+- `src/lib/presets.ts` — Shared allowlists (`HOME_TYPES`, `COMMUTE_MODES`, `SENSITIVITIES`) and one-tap urban scenarios (`SCENARIO_PRESETS`).
+- `src/lib/validation.ts` — Strict runtime schema validation, enum allowlists, string length capping, telemetry sanity checking, and prompt-injection delimiter neutralization.
+- `src/lib/rate-limit.ts` — Bounded per-IP fixed-window rate limiter emitting `X-RateLimit-*` and `Retry-After` headers.
+- `src/lib/air-quality-api.ts` — Open-Meteo geocoding, weather, and pollutant integration with `2s` timeouts and `300s` revalidation.
+- `src/lib/gemini.ts` — `@google/genai` client with XML-delimited prompt data, strict `responseSchema`, `6s` per-model timeout across a 5-model fast-failover cascade (`gemini-3.5-flash-lite` → `gemini-3.6-flash` → `gemini-3.1-flash-lite` → `gemini-3.8-flash` → `gemini-4-hydrogen`), and secret redaction.
+- `src/lib/fallback.ts` — Modular deterministic offline engine guaranteeing structured, sensitivity-aware guidance during API outages.
+- `src/lib/analyze-service.ts` — Transport-agnostic request orchestration (`processAnalyzeRequest`, `processLiveAqiRequest`) decoupled from Next.js route wrappers for direct integration testing.
+- `src/app/api/analyze/route.ts` & `src/app/api/live-aqi/route.ts` — Thin App Router handlers enforcing JSON parsing and delegating to `analyze-service.ts`.
+- `src/components/` — Accessible, modular UI components (`RoutineInputForm`, `FamilyMembersEditor`, `LiveTelemetryBanner`, `AqiSummaryCard`, `AirQualityDashboard`, `dashboard/DashboardTabsContent`, `ErrorBoundary`).
+
+---
+
+## Security, Accessibility & Quality Engineering
+
+- **Security Hardening**: Strict HTTP security headers in `next.config.ts` (`Content-Security-Policy` without production `unsafe-eval`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Strict-Transport-Security`, `Referrer-Policy`, `Permissions-Policy`, `poweredByHeader: false`), per-IP rate limiting (`429`), 50 KB request limits (`413`), enum allowlists, secret redaction, and XML prompt delimiters.
+- **Accessibility (WCAG 2.1 AA)**: Skip-to-content navigation link, strict `h1 -> h2 -> h3 -> h4` heading hierarchy, high-contrast focus outlines (`:focus-visible`), `prefers-reduced-motion` support, WAI-ARIA `tablist`/`tab`/`tabpanel` with keyboard arrow navigation, ARIA `meter` on the AQI spectrum scale, `aria-live` status updates, and unique per-member form labels.
+- **Reliability**: Route-level (`src/app/error.tsx`) and component-level (`ErrorBoundary.tsx`) error recovery plus deterministic fallback generation.
 
 ---
 
 ## Approach, Logic & Prompt Design Strategy
 
-### 1. Grounded Environmental Context (Eliminating Manual Guesswork)
-Instead of relying solely on manual user estimates of air quality, the app queries **Open-Meteo** (no API key required) to fetch real-time **US AQI, PM2.5, PM10, NO₂, O₃, temperature, humidity, and wind speed** for the user's city. This telemetry is injected directly into the LLM prompt and fallback engine.
+1. **Grounded Environmental Context**: Queries **Open-Meteo** (no API key required) concurrently for US AQI, PM2.5, PM10, NO₂, O₃, temperature, humidity, and wind speed, grounding both Gemini prompts and the fallback engine in real atmospheric conditions.
+2. **Prompt Injection Defense & System Persona**: Frames Gemini as an empathetic **Urban Air Quality & Environmental Health Specialist** and isolates user free-text inside `<user_schedule>` and `<user_notes>` delimiters.
+3. **Structured JSON Contract**: Uses `responseMimeType: "application/json"` with a typed `responseSchema` verified at runtime via `isValidPlanShape()`.
 
-### 2. Prompt Design Strategy
-- **System Instruction Persona**: Frames the model as an **Urban Air Quality & Environmental Health Specialist** focused on practical, non-alarmist, budget-conscious advice.
-- **Structured Context Injection (`buildUserPrompt`)**: Injects normalized fields (`City`, `Live Open-Meteo Telemetry`, `Home Type`, `Primary Commute Mode`, `Household Members & Sensitivities`, `Daily Schedule`, and `Budget/Constraints`).
-- **Strict Structured Output (`responseMimeType: "application/json"` + `responseSchema`)**: Enforces a deterministic JSON contract with 5 top-level keys:
-  - `aqiRiskSummary`: Estimated AQI, category enum, primary pollutants, peak inversion windows, and advisory summary.
-  - `lowEmissionRoutines`: Habit-by-habit shifts with feasibility tags, weekly kg CO₂ saved, and exposure reduction %.
-  - `indoorAirHacks`: Cost-tiered (`Free`, `Low-Cost`, `Moderate`) techniques with `winterSmogSpecific` flags and step-by-step instructions.
-  - `impactBreakdown`: Plain-language health and environmental cause-and-effect explanations per recommendation.
-  - `quickWins`: Immediate same-day actions.
+---
 
-### 3. How the Solution Works (End-to-End)
-1. User enters their city (or picks a one-tap preset) and clicks **Fetch Live AQI** (or submits directly).
-2. The frontend sends the household profile to `POST /api/analyze`.
-3. The API route validates inputs, fetches live Open-Meteo telemetry if not already attached, and calls Gemini with structured JSON mode.
-4. If `GEMINI_API_KEY` is missing or the upstream call fails/returns invalid JSON, the deterministic fallback engine produces a complete, telemetry-grounded plan so the UI never crashes.
-5. The dashboard renders the AQI spectrum bar, live weather/pollutant strip, Quick Wins, and tabbed **Low-Emission Routines**, **Indoor Air Hacks**, and **Health & Emission Impact** cards.
+## API Reference
+
+| Endpoint | Method | Purpose | Status Codes |
+| --- | --- | --- | --- |
+| `/api/analyze` | `POST` | Validate household profile, attach live telemetry, return full action plan | `200`, `400`, `413`, `429`, `500` |
+| `/api/live-aqi?city=...` | `GET` | Fetch live Open-Meteo US AQI, pollutants, and weather for a city | `200`, `400`, `404`, `429` |
 
 ---
 
 ## Assumptions Made
-- **AQI Scale**: Uses the **US EPA AQI** classification (`0–50 Good`, `51–100 Moderate`, `101–150 Unhealthy for Sensitive Groups`, `151–200 Unhealthy`, `201–300 Very Unhealthy`, `301+ Hazardous`).
-- **Emission & Exposure Estimates**: Weekly CO₂ savings (kg/week) and exposure reduction percentages are practical estimates based on typical urban commute and indoor infiltration patterns rather than clinical or sensor-calibrated measurements.
-- **API Availability**: Open-Meteo is used with a 4.5-second timeout; if unreachable, the app falls back to city/condition heuristics.
+
+- **AQI Scale**: Uses the **US EPA AQI** scale (`0–50 Good`, `51–100 Moderate`, `101–150 Unhealthy for Sensitive Groups`, `151–200 Unhealthy`, `201–300 Very Unhealthy`, `301+ Hazardous`).
+- **Emission & Exposure Estimates**: Weekly CO₂ savings (`kg/week`) and exposure reduction percentages are practical educational estimates rather than clinical or sensor-calibrated measurements.
+- **API Availability**: Open-Meteo lookups use `2s` timeouts; if unreachable, the app seamlessly uses city/season baseline heuristics.
 
 ---
 
-## Local Setup & Installation
+## Local Setup & Verification
 
 ### Prerequisites
-- Node.js 18+ (tested on Node v24.4.1)
+- Node.js 18+ (verified on Node v24)
 - npm 9+
-- A Google Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) *(optional: the app runs with a smart offline baseline if omitted)*
+- Google Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) *(optional: offline smart baseline runs automatically when omitted)*
 
-### Steps
+### Installation & Commands
+
 ```bash
 # 1. Navigate to the project directory
 cd urban-air-quality-assistant
@@ -90,12 +100,14 @@ npm install
 cp .env.example .env.local
 # Edit .env.local and set GEMINI_API_KEY=your_actual_key
 
-# 4. Run verification checks
-npm run lint
+# 4. Run full verification suite (tests, lint, typecheck)
 npm test
+npm run lint
+npx tsc --noEmit --incremental false
 
-# 5. Run the development server
+# 5. Build and run
+npm run build
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser. Licensed under the [MIT License](LICENSE).
